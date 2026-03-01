@@ -1,4 +1,5 @@
 #include "webhook.h"
+#include "common.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -38,8 +39,11 @@ int webhook_send(const char *url, const char *hostname,
 
     setenv("WEBHOOK_URL", url, 1);
     // Hardened popen: use single quotes for the URL in the shell command to prevent injection
-    FILE *curl = popen("curl -s -X POST -H \"Content-Type: application/json\" -d @- \"$WEBHOOK_URL\"", "w");
-    if (!curl) return -1;
+    FILE *curl = popen("curl -s -X POST -H \"Content-Type: application/json\" -d @- \"$WEBHOOK_URL\" 2>&1", "w");
+    if (!curl) {
+        ttop_log("ERROR", "Failed to execute curl");
+        return -1;
+    }
 
     int days = uptime->uptime_seconds / 86400;
     int hours = (uptime->uptime_seconds % 86400) / 3600;
@@ -99,6 +103,13 @@ int webhook_send(const char *url, const char *hostname,
 
     fprintf(curl, "],\"footer\":{\"text\":\"ttop v2 • Bare-metal monitoring\"},\"timestamp\":\"\"}]}");
     
-    pclose(curl);
-    return 0;
+    int status = pclose(curl);
+    if (status == 0) {
+        ttop_log("INFO", "Webhook sent successfully");
+    } else {
+        char err_msg[64];
+        snprintf(err_msg, sizeof(err_msg), "Webhook failed with status %d", status);
+        ttop_log("ERROR", err_msg);
+    }
+    return status == 0 ? 0 : -1;
 }

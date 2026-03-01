@@ -1,15 +1,26 @@
 #ifndef COMMON_H
 #define COMMON_H
+
 #include <stdio.h>
-#include <stdlib.h>
-static inline const char* get_proc_path(const char* filename, char* buf, size_t len) {
-    const char* root = getenv("TTOP_PROC_ROOT");
-    snprintf(buf, len, "%s/%s", root ? root : "/proc", filename);
-    return buf;
+#include <time.h>
+
+#define TTOP_PROTO_VERSION 2
+
+static inline void ttop_log(const char *level, const char *msg) {
+    time_t now = time(NULL);
+    struct tm *tm_info = localtime(&now);
+    char timestamp[20];
+    strftime(timestamp, 20, "%Y-%m-%d %H:%M:%S", tm_info);
+    
+    // Log to stdout/stderr (captured by journald)
+    fprintf(level[0] == 'E' ? stderr : stdout, "[%s] [%s] %s\n", timestamp, level, msg);
+    
+    // Log to file
+    FILE *f = fopen("/var/log/ttop.log", "a");
+    if (f) {
+        fprintf(f, "[%s] [%s] %s\n", timestamp, level, msg);
+        fclose(f);
+    }
 }
-static inline const char* get_sys_path(const char* filename, char* buf, size_t len) {
-    const char* root = getenv("TTOP_SYS_ROOT");
-    snprintf(buf, len, "%s/%s", root ? root : "/sys", filename);
-    return buf;
-}
+
 #endif

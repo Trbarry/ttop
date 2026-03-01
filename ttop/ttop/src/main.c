@@ -107,6 +107,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (timer_type) {
+        ttop_log("INFO", "Starting timer installation");
         if (strcmp(timer_type, "hourly") == 0) {
             printf("Installation du timer systemd (horaire)...\n");
             
@@ -118,7 +119,7 @@ int main(int argc, char *argv[]) {
 
             char timer_content[2048], service_content[2048];
             sprintf(timer_content, "[Unit]\nDescription=ttop hourly report\n\n[Timer]\nOnCalendar=hourly\nPersistent=true\n\n[Install]\nWantedBy=timers.target");
-            sprintf(service_content, "[Unit]\nDescription=ttop report service\n\n[Service]\nType=oneshot\nExecStart=%s -f\nUser=root\nGroup=root\nWorkingDirectory=%s", exe_path, "/tmp");
+            sprintf(service_content, "[Unit]\nDescription=ttop report service\n\n[Service]\nType=oneshot\nExecStart=%s -f\nUser=root\nGroup=root\nWorkingDirectory=/tmp", exe_path);
 
             FILE *ft = fopen("/tmp/ttop-report.timer", "w");
             if (ft) { fputs(timer_content, ft); fclose(ft); }
