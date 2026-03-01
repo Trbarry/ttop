@@ -118,9 +118,25 @@ int main(int argc, char *argv[]) {
             if (len != -1) exe_path[len] = '\0';
             else strcpy(exe_path, "/usr/local/bin/ttop");
 
+            // Get absolute path of ttop.conf in current directory
+            char config_abs_path[1024] = "";
+            if (realpath("ttop.conf", config_abs_path)) {
+                // Config exists in current dir, we'll use it
+            }
+
             char timer_content[2048], service_content[2048];
             sprintf(timer_content, "[Unit]\nDescription=ttop hourly report\n\n[Timer]\nOnCalendar=hourly\nPersistent=true\n\n[Install]\nWantedBy=timers.target");
-            sprintf(service_content, "[Unit]\nDescription=ttop report service\n\n[Service]\nType=oneshot\nExecStart=%s -f\nUser=root\nGroup=root\nWorkingDirectory=/tmp", exe_path);
+            
+            // Generate Service content with absolute path to config if found
+            if (config_abs_path[0]) {
+                sprintf(service_content, "[Unit]\nDescription=ttop report service\n\n[Service]\nType=oneshot\nExecStart=%s -f\nUser=root\nGroup=root\nWorkingDirectory=%s", exe_path, "/tmp");
+                // Copy current local config to /etc/ttop.conf for system-wide access
+                char cp_cmd[2048];
+                snprintf(cp_cmd, sizeof(cp_cmd), "cp %s /etc/ttop.conf 2>/dev/null || sudo cp %s /etc/ttop.conf", config_abs_path, config_abs_path);
+                system(cp_cmd);
+            } else {
+                sprintf(service_content, "[Unit]\nDescription=ttop report service\n\n[Service]\nType=oneshot\nExecStart=%s -f\nUser=root\nGroup=root\nWorkingDirectory=/tmp", exe_path);
+            }
 
             FILE *ft = fopen("/tmp/ttop-report.timer", "w");
             if (ft) { fputs(timer_content, ft); fclose(ft); }
@@ -136,6 +152,7 @@ int main(int argc, char *argv[]) {
                 system("systemctl enable --now ttop-report.timer 2>/dev/null || sudo systemctl enable --now ttop-report.timer");
                 system("systemctl restart ttop-report.service 2>/dev/null || sudo systemctl restart ttop-report.service");
                 printf("Timer systemd activé avec l'exécutable : %s\n", exe_path);
+                ttop_log("INFO", "Systemd timer installed and triggered");
             } else {
                 // Fallback to Cron for BSD/Non-systemd
                 system("(crontab -l 2>/dev/null; echo \"0 * * * * /usr/local/bin/ttop -f\") | crontab -");
