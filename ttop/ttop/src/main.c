@@ -109,13 +109,21 @@ int main(int argc, char *argv[]) {
     if (timer_type) {
         if (strcmp(timer_type, "hourly") == 0) {
             printf("Installation du timer systemd (horaire)...\n");
-            system("echo \"[Unit]\nDescription=ttop hourly report\n\n[Timer]\nOnCalendar=hourly\nPersistent=true\n\n[Install]\nWantedBy=timers.target\" > /tmp/ttop-report.timer");
-            system("echo \"[Unit]\nDescription=ttop report service\n\n[Service]\nType=oneshot\nExecStart=/usr/local/bin/ttop -f\" > /tmp/ttop-report.service");
-            system("sudo mv /tmp/ttop-report.timer /etc/systemd/system/");
-            system("sudo mv /tmp/ttop-report.service /etc/systemd/system/");
-            system("sudo systemctl daemon-reload");
-            system("sudo systemctl enable --now ttop-report.timer");
-            printf("Timer activé ! Ton serveur enverra un rapport toutes les heures.\n");
+            system("echo '[Unit]\nDescription=ttop hourly report\n\n[Timer]\nOnCalendar=hourly\nPersistent=true\n\n[Install]\nWantedBy=timers.target' > /tmp/ttop-report.timer");
+            system("echo '[Unit]\nDescription=ttop report service\n\n[Service]\nType=oneshot\nExecStart=/usr/local/bin/ttop -f' > /tmp/ttop-report.service");
+            
+            // Check for systemd
+            if (access("/run/systemd/system", F_OK) == 0) {
+                system("mv /tmp/ttop-report.timer /etc/systemd/system/ 2>/dev/null || sudo mv /tmp/ttop-report.timer /etc/systemd/system/");
+                system("mv /tmp/ttop-report.service /etc/systemd/system/ 2>/dev/null || sudo mv /tmp/ttop-report.service /etc/systemd/system/");
+                system("systemctl daemon-reload 2>/dev/null || sudo systemctl daemon-reload");
+                system("systemctl enable --now ttop-report.timer 2>/dev/null || sudo systemctl enable --now ttop-report.timer");
+                printf("Timer systemd activé !\n");
+            } else {
+                // Fallback to Cron for BSD/Non-systemd
+                system("(crontab -l 2>/dev/null; echo \"0 * * * * /usr/local/bin/ttop -f\") | crontab -");
+                printf("Cron job installé (Pas de systemd détecté).\n");
+            }
         } else {
             printf("Type de timer inconnu. Utilisez 'hourly'.\n");
         }

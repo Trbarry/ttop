@@ -8,8 +8,10 @@ static int get_nvidia(GPUInfo *g, int max) {
     char line[256]; int c = 0;
     while (fgets(line, 256, fp) && c < max) {
         char name[64]; int u, t; unsigned long long mt, mu;
-        if (sscanf(line, "%[^,], %d, %llu, %llu, %d", name, &u, &mt, &mu, &t) == 5) {
-            strncpy(g[c].model, name, 63); g[c].usage_pct = u;
+        if (sscanf(line, "%63[^,], %d, %llu, %llu, %d", name, &u, &mt, &mu, &t) == 5) {
+            strncpy(g[c].model, name, 63);
+            g[c].model[63] = '\0';
+            g[c].usage_pct = u;
             g[c].vram_total_kb = mt * 1024; g[c].vram_used_kb = mu * 1024;
             g[c].temp = (float)t; c++;
         }

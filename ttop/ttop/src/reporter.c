@@ -37,10 +37,12 @@ void reporter_send_bin(float cpu_usage, const MemoryInfo *mem, const ThermalInfo
     for (int i = 0; i < 3 && i < num_procs; i++) {
         packet.top_procs[i].pid = procs[i].pid;
         strncpy(packet.top_procs[i].name, procs[i].name, 15);
+        packet.top_procs[i].name[15] = '\0';
         packet.top_procs[i].rss_kb = procs[i].mem_rss_kb;
     }
     if (num_gpus > 0 && gpus) {
         strncpy(packet.gpu.model, gpus[0].model, 15);
+        packet.gpu.model[15] = '\0';
         packet.gpu.usage_pct = (int8_t)gpus[0].usage_pct;
         packet.gpu.vram_used_kb = gpus[0].vram_used_kb;
     } else packet.gpu.usage_pct = -1;

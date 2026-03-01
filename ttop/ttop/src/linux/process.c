@@ -21,7 +21,7 @@ int get_top_processes(ProcessInfo *p, int max) {
         if (!isdigit(e->d_name[0])) continue;
         
         char path[256];
-        snprintf(path, sizeof(path), "/proc/%s/status", e->d_name);
+        snprintf(path, sizeof(path), "/proc/%.240s/status", e->d_name);
         FILE *f = fopen(path, "r");
         if (f) {
             char line[256];
