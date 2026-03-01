@@ -1,6 +1,7 @@
 #include "thermal.h"
 #include <sys/types.h>
 #include <sys/sysctl.h>
+#include <stdlib.h>
 int get_thermal_info(ThermalInfo *info) {
     int temp;
     size_t sz = sizeof(temp);
