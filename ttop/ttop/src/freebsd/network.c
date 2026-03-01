@@ -3,7 +3,7 @@
 #include <sys/socket.h>
 #include <ifaddrs.h>
 #include <net/if.h>
-#include <net/if_data.h>
+#include <net/if_dl.h>
 #include <string.h>
 int get_network_info(NetworkInfo *info) {
     struct ifaddrs *ifaddr, *ifa;
