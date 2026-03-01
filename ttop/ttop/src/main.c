@@ -5,6 +5,8 @@
 #include <string.h>
 #include <getopt.h>
 #include <signal.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include <inttypes.h>
 #include "memory.h"
 #include "cpu.h"
@@ -24,13 +26,15 @@ static volatile sig_atomic_t stop = 0;
 void handle_signal(int sig) { (void)sig; stop = 1; }
 
 void save_config(const char *path, const char *webhook_url, int interval, const char *hostname) {
-    FILE *f = fopen(path, "w");
-    if (!f) return;
+    int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    if (fd < 0) return;
+    FILE *f = fdopen(fd, "w");
+    if (!f) { close(fd); return; }
     if (webhook_url) fprintf(f, "webhook_url=%s\n", webhook_url);
     fprintf(f, "interval=%d\n", interval);
     fprintf(f, "hostname=%s\n", hostname);
     fclose(f);
-    printf("Configuration sauvegardée dans %s\n", path);
+    printf("Configuration sauvegardée dans %s (permissions 600)\n", path);
 }
 
 void usage(const char *prog) {
@@ -43,15 +47,16 @@ void usage(const char *prog) {
     printf("  -n hostname   Nom de l'hôte (défaut: auto)\n");
     printf("  -s            Sauvegarder les paramètres actuels dans ttop.conf\n");
     printf("  -f            Forcer l'envoi immédiat d'un webhook et quitter\n");
+    printf("  -t hourly     Installer un timer systemd pour un rapport horaire\n");
     printf("  -h host       Hôte UDP (défaut: 127.0.0.1)\n");
     printf("  -p port       Port UDP (défaut: 9999)\n\n");
     printf("Exemples :\n");
-    printf("  1. Tester et sauvegarder un webhook :\n");
-    printf("     %s -w \"https://discord.com/api/...\" -s -f\n\n", prog);
-    printf("  2. Lancer en mode démon avec l'intervalle sauvegardé :\n");
-    printf("     %s -d\n\n", prog);
-    printf("  3. Envoyer un rapport unique avec un nom d'hôte spécifique :\n");
-    printf("     %s -n \"Serveur-Prod\" -f\n", prog);
+    printf("  1. Configurer un webhook et activer le rapport horaire automatique :\n");
+    printf("     sudo %s -w \"https://discord.com/...\" -s -t hourly\n\n", prog);
+    printf("  2. Lancer en mode démon (en continu) avec un intervalle de 60s :\n");
+    printf("     %s -d -i 60\n\n", prog);
+    printf("  3. Envoyer un rapport unique immédiatement (test) :\n");
+    printf("     %s -f\n", prog);
     exit(1);
 }
 
@@ -75,6 +80,7 @@ void load_config(const char *path, char **webhook_url, int *interval, char *host
 int main(int argc, char *argv[]) {
     int is_daemon = 0, use_binary = 0, port = 9999, interval = 1;
     int save_cfg = 0, force_sync = 0;
+    char *timer_type = NULL;
     char *host = "127.0.0.1", *webhook_url = NULL;
     char hostname[64];
     gethostname(hostname, sizeof(hostname));
@@ -83,7 +89,7 @@ int main(int argc, char *argv[]) {
     load_config("ttop.conf", &webhook_url, &interval, hostname);
 
     int opt;
-    while ((opt = getopt(argc, argv, "dbh:p:w:i:n:sf?")) != -1) {
+    while ((opt = getopt(argc, argv, "dbh:p:w:i:n:sf?t:")) != -1) {
         switch (opt) {
             case 'd': is_daemon = 1; break;
             case 'b': use_binary = 1; break;
@@ -94,9 +100,26 @@ int main(int argc, char *argv[]) {
             case 'n': strncpy(hostname, optarg, sizeof(hostname)-1); break;
             case 's': save_cfg = 1; break;
             case 'f': force_sync = 1; break;
+            case 't': timer_type = optarg; break;
             case '?': usage(argv[0]); break;
             default: usage(argv[0]);
         }
+    }
+
+    if (timer_type) {
+        if (strcmp(timer_type, "hourly") == 0) {
+            printf("Installation du timer systemd (horaire)...\n");
+            system("echo \"[Unit]\nDescription=ttop hourly report\n\n[Timer]\nOnCalendar=hourly\nPersistent=true\n\n[Install]\nWantedBy=timers.target\" > /tmp/ttop-report.timer");
+            system("echo \"[Unit]\nDescription=ttop report service\n\n[Service]\nType=oneshot\nExecStart=/usr/local/bin/ttop -f\" > /tmp/ttop-report.service");
+            system("sudo mv /tmp/ttop-report.timer /etc/systemd/system/");
+            system("sudo mv /tmp/ttop-report.service /etc/systemd/system/");
+            system("sudo systemctl daemon-reload");
+            system("sudo systemctl enable --now ttop-report.timer");
+            printf("Timer activé ! Ton serveur enverra un rapport toutes les heures.\n");
+        } else {
+            printf("Type de timer inconnu. Utilisez 'hourly'.\n");
+        }
+        return 0;
     }
     // Handle --help or no args
     if (argc > 1 && strcmp(argv[1], "--help") == 0) usage(argv[0]);

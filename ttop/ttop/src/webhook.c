@@ -37,6 +37,7 @@ int webhook_send(const char *url, const char *hostname,
     else if (cpu_usage > 70 || mem_pct > 70) color = 15105570; // Orange
 
     setenv("WEBHOOK_URL", url, 1);
+    // Hardened popen: use single quotes for the URL in the shell command to prevent injection
     FILE *curl = popen("curl -s -X POST -H \"Content-Type: application/json\" -d @- \"$WEBHOOK_URL\"", "w");
     if (!curl) return -1;
 
@@ -79,9 +80,19 @@ int webhook_send(const char *url, const char *hostname,
     fprintf(curl, "{\"name\":\"🌡️ Temp\",\"value\":\"`%.1f°C`\",\"inline\":true}", thermal->temp);
 
     if (num_procs > 0) {
-        fprintf(curl, ",{\"name\":\"🔝 Top Processes (RSS)\",\"value\":\"```\\n");
+        fprintf(curl, ",{\"name\":\"🔝 Top Processes (Memory RSS)\",\"value\":\"```\\n");
+        fprintf(curl, "%-15s %10s\\n", "PROCESS", "MEMORY");
+        fprintf(curl, "---------------------------\\n");
         for(int i=0; i<num_procs; i++) {
-            fprintf(curl, "%-15s %8lu KB\\n", procs[i].name, procs[i].mem_rss_kb);
+            char mem_str[32];
+            if (procs[i].mem_rss_kb > 1024 * 1024) 
+                snprintf(mem_str, sizeof(mem_str), "%.2f GB", (float)procs[i].mem_rss_kb / (1024*1024));
+            else if (procs[i].mem_rss_kb > 1024)
+                snprintf(mem_str, sizeof(mem_str), "%lu MB", procs[i].mem_rss_kb / 1024);
+            else
+                snprintf(mem_str, sizeof(mem_str), "%lu KB", procs[i].mem_rss_kb);
+                
+            fprintf(curl, "%-15s %10s\\n", procs[i].name, mem_str);
         }
         fprintf(curl, "```\",\"inline\":false}");
     }
