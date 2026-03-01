@@ -32,8 +32,8 @@ clean:
 
 install: $(TARGET)
 	install -m 755 $(TARGET) /usr/local/bin/
-	if [ -f ttop.service ]; then install -m 644 ttop.service /etc/systemd/system/; fi
-	if [ -f ttop.conf ]; then install -m 644 ttop.conf /etc/ttop.conf; fi
+	if [ -f ttop.service ]; then cp ttop.service /etc/systemd/system/ 2>/dev/null || sudo cp ttop.service /etc/systemd/system/; fi
+	if [ -f ttop.conf ]; then install -m 600 ttop.conf /etc/ttop.conf 2>/dev/null || sudo install -m 600 ttop.conf /etc/ttop.conf; fi
 
 uninstall:
 	rm -f /usr/local/bin/$(TARGET)

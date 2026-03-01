@@ -110,12 +110,13 @@ int main(int argc, char *argv[]) {
         if (strcmp(timer_type, "hourly") == 0) {
             printf("Installation du timer systemd (horaire)...\n");
             system("echo '[Unit]\nDescription=ttop hourly report\n\n[Timer]\nOnCalendar=hourly\nPersistent=true\n\n[Install]\nWantedBy=timers.target' > /tmp/ttop-report.timer");
-            system("echo '[Unit]\nDescription=ttop report service\n\n[Service]\nType=oneshot\nExecStart=/usr/local/bin/ttop -f' > /tmp/ttop-report.service");
+            system("echo '[Unit]\nDescription=ttop report service\n\n[Service]\nType=oneshot\nExecStart=/usr/local/bin/ttop -f\nUser=root' > /tmp/ttop-report.service");
             
             // Check for systemd
             if (access("/run/systemd/system", F_OK) == 0) {
                 system("mv /tmp/ttop-report.timer /etc/systemd/system/ 2>/dev/null || sudo mv /tmp/ttop-report.timer /etc/systemd/system/");
                 system("mv /tmp/ttop-report.service /etc/systemd/system/ 2>/dev/null || sudo mv /tmp/ttop-report.service /etc/systemd/system/");
+                system("chmod 644 /etc/systemd/system/ttop-report.* 2>/dev/null || sudo chmod 644 /etc/systemd/system/ttop-report.*");
                 system("systemctl daemon-reload 2>/dev/null || sudo systemctl daemon-reload");
                 system("systemctl enable --now ttop-report.timer 2>/dev/null || sudo systemctl enable --now ttop-report.timer");
                 printf("Timer systemd activé !\n");
