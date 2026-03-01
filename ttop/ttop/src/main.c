@@ -106,9 +106,19 @@ int main(int argc, char *argv[]) {
             default: usage(argv[0]);
         }
     }
+    // Handle --help or no args
+    if (argc > 1 && strcmp(argv[1], "--help") == 0) usage(argv[0]);
+
+    if (save_cfg) {
+        save_config("ttop.conf", webhook_url, interval, hostname);
+        // Save globally as well if running as root
+        save_config("/etc/ttop.conf", webhook_url, interval, hostname);
+        if (!force_sync && !timer_type) return 0;
+    }
 
     if (timer_type) {
         ttop_log("INFO", "Starting timer installation");
+
         if (strcmp(timer_type, "hourly") == 0) {
             printf("Installation du timer systemd (horaire)...\n");
             
@@ -118,24 +128,20 @@ int main(int argc, char *argv[]) {
             if (len != -1) exe_path[len] = '\0';
             else strcpy(exe_path, "/usr/local/bin/ttop");
 
-            // Get absolute path of ttop.conf in current directory
-            char config_abs_path[1024] = "";
-            if (realpath("ttop.conf", config_abs_path)) {
-                // Config exists in current dir, we'll use it
-            }
-
             char timer_content[2048], service_content[2048];
             sprintf(timer_content, "[Unit]\nDescription=ttop hourly report\n\n[Timer]\nOnCalendar=hourly\nPersistent=true\n\n[Install]\nWantedBy=timers.target");
             
-            // Generate Service content with absolute path to config if found
-            if (config_abs_path[0]) {
-                sprintf(service_content, "[Unit]\nDescription=ttop report service\n\n[Service]\nType=oneshot\nExecStart=%s -f\nUser=root\nGroup=root\nWorkingDirectory=%s", exe_path, "/tmp");
-                // Copy current local config to /etc/ttop.conf for system-wide access
-                char cp_cmd[2048];
-                snprintf(cp_cmd, sizeof(cp_cmd), "cp %s /etc/ttop.conf 2>/dev/null || sudo cp %s /etc/ttop.conf", config_abs_path, config_abs_path);
-                system(cp_cmd);
+            // On Proxmox/Root, we should use a fixed config location that systemd can always access
+            sprintf(service_content, "[Unit]\nDescription=ttop report service\n\n[Service]\nType=oneshot\nExecStart=%s -f\nUser=root\nGroup=root\nWorkingDirectory=/tmp", exe_path);
+
+            // If we have a webhook URL currently (from -w), save it directly to /etc/ttop.conf
+            if (webhook_url) {
+                save_config("/etc/ttop.conf", webhook_url, interval, hostname);
+                ttop_log("INFO", "Saved config to /etc/ttop.conf during timer install");
             } else {
-                sprintf(service_content, "[Unit]\nDescription=ttop report service\n\n[Service]\nType=oneshot\nExecStart=%s -f\nUser=root\nGroup=root\nWorkingDirectory=/tmp", exe_path);
+                // Try to migrate local config if it exists
+                system("cp ttop.conf /etc/ttop.conf 2>/dev/null || sudo cp ttop.conf /etc/ttop.conf");
+                system("chmod 600 /etc/ttop.conf 2>/dev/null || sudo chmod 600 /etc/ttop.conf");
             }
 
             FILE *ft = fopen("/tmp/ttop-report.timer", "w");
@@ -150,25 +156,20 @@ int main(int argc, char *argv[]) {
                 system("chmod 644 /etc/systemd/system/ttop-report.* 2>/dev/null || sudo chmod 644 /etc/systemd/system/ttop-report.*");
                 system("systemctl daemon-reload 2>/dev/null || sudo systemctl daemon-reload");
                 system("systemctl enable --now ttop-report.timer 2>/dev/null || sudo systemctl enable --now ttop-report.timer");
-                system("systemctl restart ttop-report.service 2>/dev/null || sudo systemctl restart ttop-report.service");
+                system("systemctl start ttop-report.service 2>/dev/null || sudo systemctl start ttop-report.service");
                 printf("Timer systemd activé avec l'exécutable : %s\n", exe_path);
-                ttop_log("INFO", "Systemd timer installed and triggered");
+                ttop_log("INFO", "Systemd timer and service installed/restarted");
             } else {
                 // Fallback to Cron for BSD/Non-systemd
                 system("(crontab -l 2>/dev/null; echo \"0 * * * * /usr/local/bin/ttop -f\") | crontab -");
                 printf("Cron job installé (Pas de systemd détecté).\n");
+                ttop_log("INFO", "Cron job installed as fallback");
             }
         } else {
+            ttop_log("ERROR", "Unknown timer type");
             printf("Type de timer inconnu. Utilisez 'hourly'.\n");
         }
         return 0;
-    }
-    // Handle --help or no args
-    if (argc > 1 && strcmp(argv[1], "--help") == 0) usage(argv[0]);
-
-    if (save_cfg) {
-        save_config("ttop.conf", webhook_url, interval, hostname);
-        if (!force_sync) return 0;
     }
 
     struct sigaction sa;
