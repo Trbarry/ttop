@@ -21,6 +21,7 @@
 #include "process.h"
 #include "filesystem.h"
 #include "gpu.h"
+#include "common.h"
 
 static volatile sig_atomic_t stop = 0;
 void handle_signal(int sig) { (void)sig; stop = 1; }
