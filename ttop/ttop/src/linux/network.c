@@ -19,6 +19,7 @@ int get_network_info(NetworkInfo *info) {
             if (rx > 0 || tx > 0 || strcmp(name, "lo") != 0) {
                 memset(info->interfaces[count].name, 0, 32);
                 strncpy(info->interfaces[count].name, name, 31);
+                info->interfaces[count].name[31] = '\0';
                 info->interfaces[count].rx_bytes = rx;
                 info->interfaces[count].tx_bytes = tx;
                 count++;
