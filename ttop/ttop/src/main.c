@@ -118,7 +118,7 @@ int main(int argc, char *argv[]) {
 
             char timer_content[2048], service_content[2048];
             sprintf(timer_content, "[Unit]\nDescription=ttop hourly report\n\n[Timer]\nOnCalendar=hourly\nPersistent=true\n\n[Install]\nWantedBy=timers.target");
-            sprintf(service_content, "[Unit]\nDescription=ttop report service\n\n[Service]\nType=oneshot\nExecStart=%s -f\nUser=root\nGroup=root", exe_path);
+            sprintf(service_content, "[Unit]\nDescription=ttop report service\n\n[Service]\nType=oneshot\nExecStart=%s -f\nUser=root\nGroup=root\nWorkingDirectory=%s", exe_path, "/tmp");
 
             FILE *ft = fopen("/tmp/ttop-report.timer", "w");
             if (ft) { fputs(timer_content, ft); fclose(ft); }
@@ -132,7 +132,7 @@ int main(int argc, char *argv[]) {
                 system("chmod 644 /etc/systemd/system/ttop-report.* 2>/dev/null || sudo chmod 644 /etc/systemd/system/ttop-report.*");
                 system("systemctl daemon-reload 2>/dev/null || sudo systemctl daemon-reload");
                 system("systemctl enable --now ttop-report.timer 2>/dev/null || sudo systemctl enable --now ttop-report.timer");
-                system("systemctl start ttop-report.service 2>/dev/null || sudo systemctl start ttop-report.service");
+                system("systemctl restart ttop-report.service 2>/dev/null || sudo systemctl restart ttop-report.service");
                 printf("Timer systemd activé avec l'exécutable : %s\n", exe_path);
             } else {
                 // Fallback to Cron for BSD/Non-systemd
