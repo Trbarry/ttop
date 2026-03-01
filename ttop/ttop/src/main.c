@@ -109,8 +109,21 @@ int main(int argc, char *argv[]) {
     if (timer_type) {
         if (strcmp(timer_type, "hourly") == 0) {
             printf("Installation du timer systemd (horaire)...\n");
-            system("echo '[Unit]\nDescription=ttop hourly report\n\n[Timer]\nOnCalendar=hourly\nPersistent=true\n\n[Install]\nWantedBy=timers.target' > /tmp/ttop-report.timer");
-            system("echo '[Unit]\nDescription=ttop report service\n\n[Service]\nType=oneshot\nExecStart=/usr/local/bin/ttop -f\nUser=root\nGroup=root' > /tmp/ttop-report.service");
+            
+            // Get full path of current executable
+            char exe_path[1024];
+            ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path)-1);
+            if (len != -1) exe_path[len] = '\0';
+            else strcpy(exe_path, "/usr/local/bin/ttop");
+
+            char timer_content[2048], service_content[2048];
+            sprintf(timer_content, "[Unit]\nDescription=ttop hourly report\n\n[Timer]\nOnCalendar=hourly\nPersistent=true\n\n[Install]\nWantedBy=timers.target");
+            sprintf(service_content, "[Unit]\nDescription=ttop report service\n\n[Service]\nType=oneshot\nExecStart=%s -f\nUser=root\nGroup=root", exe_path);
+
+            FILE *ft = fopen("/tmp/ttop-report.timer", "w");
+            if (ft) { fputs(timer_content, ft); fclose(ft); }
+            FILE *fs = fopen("/tmp/ttop-report.service", "w");
+            if (fs) { fputs(service_content, fs); fclose(fs); }
             
             // Check for systemd
             if (access("/run/systemd/system", F_OK) == 0) {
@@ -120,7 +133,7 @@ int main(int argc, char *argv[]) {
                 system("systemctl daemon-reload 2>/dev/null || sudo systemctl daemon-reload");
                 system("systemctl enable --now ttop-report.timer 2>/dev/null || sudo systemctl enable --now ttop-report.timer");
                 system("systemctl start ttop-report.service 2>/dev/null || sudo systemctl start ttop-report.service");
-                printf("Timer systemd activé et premier rapport envoyé !\n");
+                printf("Timer systemd activé avec l'exécutable : %s\n", exe_path);
             } else {
                 // Fallback to Cron for BSD/Non-systemd
                 system("(crontab -l 2>/dev/null; echo \"0 * * * * /usr/local/bin/ttop -f\") | crontab -");
