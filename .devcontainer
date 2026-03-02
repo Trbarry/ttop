@@ -1,0 +1,21 @@
+{
+  "name": "ttop-development-env",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu", 
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:1": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "RooCode.roo-code",           // L'extension principale
+        "ms-vscode.cpptools",         // IntelliSense pour ton C
+        "ms-vscode.cpptools-extension-pack",
+        "jeff-hykin.better-cpp-syntax"
+      ]
+    }
+  },
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y build-essential gcc make gdb"
+}
